@@ -6,8 +6,9 @@ result is wrong, you usually can't tell **which step broke**. This tool runs the
 agent on test cases, scores it against a known-correct answer key, and **fails the
 build when a new version gets worse** — so you catch mistakes before your users do.
 
-Built for the kind of agent Renfort ships: one that hears a dentist and fills the
-patient chart.
+The engine is **domain-agnostic** — point it at any voice/tool-calling agent. One of the
+demos mirrors a real product category: an assistant that hears a clinician dictate and
+fills a patient chart.
 
 > **New here?** This README gets you running. For the deep version — architecture,
 > the sample test cases explained, and the roadmap — see **[GUIDE.md](./GUIDE.md)**.
@@ -83,7 +84,8 @@ build if it dropped.
 
 ```
 platform/src/     the ENGINE (domain-agnostic — you never edit this):
-                  run → fold → score → judge → gate, the CLI, the HTML report
+                  run → fold → score → judge → gate, the CLI, the HTML report,
+                  and match.ts (shared, unit-tested date/time/text comparisons)
 
 adapters/         YOUR agents go here
   sample-agent.ts   copy-me template — a tiny agent with step-by-step comments
@@ -268,9 +270,8 @@ spoken reply is **automatically saved** as `reply.mp3` next to that case's resul
 results/receptionist/<run>/cases/<id>/reply.mp3     # play it back
 ```
 
-(Offline `mock` runs don't; add `--speak` to force it there too.) It's playback only —
-the reply is still *judged as text*, so scores don't change. Cases with no spoken reply
-(dental) are skipped, and it no-ops if no TTS key is set.
+It's playback only — the reply is still *judged as text*, so scores don't change. Cases
+with no spoken reply (dental) are skipped, and it no-ops if no TTS key is set.
 
 ---
 

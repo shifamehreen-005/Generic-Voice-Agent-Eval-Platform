@@ -137,22 +137,19 @@ async function cmdRun() {
   }
   store.updateGateResult(runId, passed);
   writeHtml(dir);                                   // always leave a fresh report.html
-  // Voice the reply to reply.mp3: automatically on a real run (openai/anthropic),
-  // or on demand with --speak. Skips silently with no TTS key or no reply.
-  if (flag("speak") || model === "openai" || model === "anthropic") await speakReplies(runs, dir, runId);
+  // On a real run, voice each agent's spoken reply to reply.mp3 (demo playback,
+  // never affects a score). Skips silently with no TTS key or no reply.
+  if (model === "openai" || model === "anthropic") await speakReplies(runs, dir, runId);
   printGate(res, baseLabel, json, store.runDirRel(runId), label);
   process.exit(passed ? 0 : 1);
 }
 
-// --speak (optional, demo only): turn each agent's spoken reply into an .mp3 next
-// to that case's results, so you can play the agent talking. Does NOT affect any
-// score — the reply is still judged as text. Prefers ElevenLabs, falls back to OpenAI.
+// Turn each agent's spoken reply into an .mp3 next to that case's results, so you
+// can play the agent talking. Does NOT affect any score — the reply is still judged
+// as text. Prefers ElevenLabs, falls back to OpenAI.
 async function speakReplies(runs: any[], dir: string, runId: string) {
   const useEleven = !!process.env.ELEVENLABS_API_KEY;
-  if (!useEleven && !process.env.OPENAI_API_KEY) {
-    console.log(c.dim("\n  (--speak skipped: needs OPENAI_API_KEY or ELEVENLABS_API_KEY in .env)"));
-    return;
-  }
+  if (!useEleven && !process.env.OPENAI_API_KEY) return;   // no TTS key → nothing to do
   let n = 0;
   for (const r of runs) {
     const ev = (r.artifacts?.events ?? []).find((e: any) => e.kind === "assistant_text");
@@ -160,7 +157,7 @@ async function speakReplies(runs: any[], dir: string, runId: string) {
     if (!text) continue;                              // nothing spoken (e.g. dental) → skip
     const out = join(dir, "cases", r.result.caseId, "reply.mp3");
     try { if (useEleven) await ttsElevenLabs(text, out); else await ttsOpenAI(text, out); n++; }
-    catch (e) { console.log(c.dim(`  (--speak: couldn't voice ${r.result.caseId}: ${e instanceof Error ? e.message.split("\n")[0] : e})`)); }
+    catch (e) { console.log(c.dim(`  (reply audio: couldn't voice ${r.result.caseId}: ${e instanceof Error ? e.message.split("\n")[0] : e})`)); }
   }
   if (n) console.log(c.dim(`\n  🔊 voiced ${n} repl${n === 1 ? "y" : "ies"} → ${store.runDirRel(runId)}/cases/<case>/reply.mp3`));
 }
@@ -351,7 +348,7 @@ const table: Record<string, () => void | Promise<void>> = {
 };
 if (!table[cmd]) {
   console.log(`usage: eval <run|score|gate|lint|draft|cases|runs|show|html> [...]\n` +
-    `  run  --adapter <name> [--provider mock|mock-bug|openai|anthropic] [--stt mock|openai] [--repeat N] [--name x] [--speak]\n` +
+    `  run  --adapter <name> [--provider mock|mock-bug|openai|anthropic] [--stt mock|openai] [--repeat N] [--name x]\n` +
     `  html --run <name>     write a readable results/<run>/report.html\n` +
     `adapters: ${allAdapters().join(", ")}`);
   process.exit(cmd ? 1 : 0);

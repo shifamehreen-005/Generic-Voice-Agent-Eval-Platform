@@ -77,6 +77,8 @@ blame the audio/STT first.
 agent-eval/
 ├── README.md              quick start + how you define tests & scoring
 ├── GUIDE.md               this file (deep dive + build-vs-buy pitch + roadmap)
+├── SUBMISSION.md          the narrative / pitch write-up
+├── DECISIONS.md           the design-decision log (why each choice was made)
 ├── package.json           npm scripts (eval, test, eval:real …)
 ├── .env.example           where API keys go (copy to .env; gitignored)
 │
@@ -105,6 +107,7 @@ agent-eval/
 │   ├── stt.ts             layer 1 — speech-to-text accuracy
 │   ├── trajectory.ts      layer 2 — right tools / order
 │   ├── judge.ts           layer 3 — quote-anchored judge harness
+│   ├── match.ts           shared, unit-tested comparisons (date/time/text/…)
 │   ├── mockJudge.ts       offline judge (no key)
 │   ├── llmJudge.ts        real LLM judge (temperature 0)
 │   ├── explain.ts         plain-English "what went wrong"
@@ -225,9 +228,8 @@ the weak run is graded against it, so a drop shows up as **✗ FAILED** with the
 
 **Reply audio** — on a real run the agent's spoken reply is saved automatically to
 `results/<adapter>/<run>/cases/<id>/reply.mp3` (ElevenLabs if that key is set, else
-OpenAI). Offline `mock` runs skip it; add `--speak` to force it there too. It's demo
-playback only: the reply is still judged as *text*, so scores are unchanged; cases with
-no reply (dental) are skipped and it no-ops without a TTS key.
+OpenAI). It's demo playback only: the reply is still judged as *text*, so scores are
+unchanged; cases with no reply (dental) are skipped and it no-ops without a TTS key.
 
 ### C. Add your own agent + cases
 1. Copy `adapters/sample-agent.ts` → `adapters/mydomain.ts`, point `run()` at your
