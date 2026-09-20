@@ -1,0 +1,27 @@
+{
+  "_readme": "A TEST CASE = one spoken input + the correct answer (groundTruth). 'audioFile'/'referenceTranscript' is what's said; 'groundTruth.teeth' is the answer key the platform grades against. Keys starting with _ are notes and are ignored by the loader.",
+  "id": "dental-fullmouth-01",
+  "schemaVersion": 1,
+  "adapter": "dental",
+  "audioFile": "dental-fullmouth-01.mp3",
+  "referenceTranscript": "Tooth number 14, pockets 3, 2, 4. Tooth number 15, pockets 2, 2, 3. Tooth number 18, pockets 4, 5, 4. Tooth number 19, pockets 3, 3, 2.",
+  "criticalTranscript": "14 3 2 4 15 2 2 3 18 4 5 4 19 3 3 2",
+  "speakers": {"primary": "S1", "roster": ["S1"]},
+  "provenance": {"kind": "gold", "author": "shifa", "approvedAt": "2026-09-18"},
+  "tags": ["fullmouth", "dental", "numbers"],
+  "groundTruth": {
+    "teeth": {
+      "14": [3, 2, 4],
+      "15": [2, 2, 3],
+      "18": [4, 5, 4],
+      "19": [3, 3, 2]
+    },
+    "_expectedCalls": "optional: the tool calls the Tools column checks for. One chart_tooth per tooth (order doesn't matter here, so no 'ordered').",
+    "expectedCalls": [
+      {"name": "chart_tooth"},
+      {"name": "chart_tooth"},
+      {"name": "chart_tooth"},
+      {"name": "chart_tooth"}
+    ]
+  }
+}

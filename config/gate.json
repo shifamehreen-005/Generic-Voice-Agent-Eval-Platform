@@ -1,0 +1,5 @@
+{
+  "tolerance": 0.02,
+  "p95Latency": 0.20,
+  "costPerCase": 0.75
+}

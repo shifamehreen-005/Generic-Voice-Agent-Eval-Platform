@@ -1,0 +1,25 @@
+{
+  "_readme": "Dental test case: spoken pocket depths + the correct per-tooth answer key in groundTruth.teeth. Scored within ±1mm. _-keys are ignored notes.",
+  "id": "dental-quadrant-02",
+  "schemaVersion": 1,
+  "adapter": "dental",
+  "audioFile": "dental-quadrant-02.mp3",
+  "referenceTranscript": "Tooth number 30, pockets 2, 2, 3. Tooth number 31, pockets 3, 3, 3. Tooth number 32, pockets 4, 4, 5.",
+  "criticalTranscript": "30 2 2 3 31 3 3 3 32 4 4 5",
+  "speakers": {"primary": "S1", "roster": ["S1"]},
+  "provenance": {"kind": "gold", "author": "shifa", "approvedAt": "2026-09-18"},
+  "tags": ["quadrant", "dental", "numbers"],
+  "groundTruth": {
+    "teeth": {
+      "30": [2, 2, 3],
+      "31": [3, 3, 3],
+      "32": [4, 4, 5]
+    },
+    "_expectedCalls": "optional: the tool calls the Tools column checks for. One chart_tooth per tooth.",
+    "expectedCalls": [
+      {"name": "chart_tooth"},
+      {"name": "chart_tooth"},
+      {"name": "chart_tooth"}
+    ]
+  }
+}

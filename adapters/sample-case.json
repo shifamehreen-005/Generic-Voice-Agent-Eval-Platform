@@ -1,0 +1,14 @@
+{
+  "_readme": "A runnable example test for the sample adapter. `transcriptText` is what was said (no audio needed). groundTruth is the correct answer the agent should produce. Run: npm run eval -- run --cases adapters/sample-case.json --adapter sample",
+  "id": "sample-reminder-01",
+  "schemaVersion": 1,
+  "adapter": "sample",
+  "transcriptText": "Remind me to call the pharmacy at 4pm.",
+  "referenceTranscript": "Remind me to call the pharmacy at 4pm.",
+  "provenance": {"kind": "gold", "author": "you", "approvedAt": "2026-09-19"},
+  "tags": ["sample", "reminder"],
+  "groundTruth": {
+    "text": "call the pharmacy",
+    "time": "4pm"
+  }
+}

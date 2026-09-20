@@ -1,0 +1,28 @@
+{
+  "_readme": "Receptionist test case: correct booking in groundTruth (code-graded) + reply_facts the spoken reply must confirm (LLM-judge-graded). _-keys are ignored notes.",
+  "id": "receptionist-02",
+  "schemaVersion": 1,
+  "adapter": "receptionist",
+  "audioFile": "receptionist-02.mp3",
+  "referenceTranscript": "Hello, this is Sarah Nguyen, I would like to book a checkup on October 5th at 9am.",
+  "speakers": {"primary": "S1", "roster": ["S1", "S2"]},
+  "provenance": {"kind": "gold", "author": "shifa", "approvedAt": "2026-09-19"},
+  "tags": ["book", "front-desk"],
+  "groundTruth": {
+    "action": "book",
+    "name": "Sarah Nguyen",
+    "date": "2026-10-05",
+    "time": "09:00",
+    "type": "checkup",
+    "reply_facts": [
+      {"id": "rf1", "text": "Sarah Nguyen"},
+      {"id": "rf2", "text": "checkup"},
+      {"id": "rf3", "text": "October 5th"}
+    ],
+    "expectedCalls": [
+      {"name": "lookup_patient"},
+      {"name": "get_availability", "ordered": true},
+      {"name": "book_appointment", "ordered": true}
+    ]
+  }
+}

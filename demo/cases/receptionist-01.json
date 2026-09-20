@@ -1,0 +1,28 @@
+{
+  "_readme": "Receptionist test case. groundTruth = the correct booking (action/name/date/time/type) graded by code, PLUS reply_facts the spoken reply must confirm (graded by the LLM judge). expectedCalls = the tools that should fire, in order. _-keys are ignored notes.",
+  "id": "receptionist-01",
+  "schemaVersion": 1,
+  "adapter": "receptionist",
+  "audioFile": "receptionist-01.mp3",
+  "referenceTranscript": "Hi, this is Marcus Bell. Please reschedule my cleaning to October 3rd at 2pm.",
+  "speakers": {"primary": "S1", "roster": ["S1", "S2"]},
+  "provenance": {"kind": "gold", "author": "shifa", "approvedAt": "2026-09-19"},
+  "tags": ["reschedule", "front-desk"],
+  "groundTruth": {
+    "action": "reschedule",
+    "name": "Marcus Bell",
+    "date": "2026-10-03",
+    "time": "14:00",
+    "type": "cleaning",
+    "reply_facts": [
+      {"id": "rf1", "text": "Marcus Bell"},
+      {"id": "rf2", "text": "cleaning"},
+      {"id": "rf3", "text": "October 3rd"}
+    ],
+    "expectedCalls": [
+      {"name": "lookup_patient"},
+      {"name": "get_availability", "ordered": true},
+      {"name": "reschedule_appointment", "ordered": true}
+    ]
+  }
+}
