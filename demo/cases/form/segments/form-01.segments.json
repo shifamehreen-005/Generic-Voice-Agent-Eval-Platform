@@ -1,0 +1,6 @@
+[
+  {"id": 0, "text": "name is Ada", "speaker": "S1", "startMs": 0, "durationMs": 200, "isFinal": true, "confidence": 0.9},
+  {"id": 1, "text": "name is Bea", "speaker": "S1", "startMs": 800, "durationMs": 200, "isFinal": true, "confidence": 0.9},
+  {"id": 2, "text": "city is Paris", "speaker": "S1", "startMs": 1600, "durationMs": 200, "isFinal": true, "confidence": 0.8},
+  {"id": 3, "text": "city is Lyon", "speaker": "S2", "startMs": 2400, "durationMs": 200, "isFinal": true, "confidence": 0.8}
+]

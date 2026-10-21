@@ -8,3 +8,5 @@
 // ============================================================================
 import "./dental/adapter.ts";        // charts teeth from dictation (no spoken reply)
 import "./receptionist/adapter.ts";  // books/reschedules + a spoken reply that is judged
+import "./form/adapter.ts";          // streaming form: fields arrive one segment at a time
+import "./brief/adapter.ts";         // sectioned document judged in code + quotes

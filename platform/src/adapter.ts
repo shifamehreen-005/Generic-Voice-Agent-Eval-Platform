@@ -7,12 +7,16 @@
 // ============================================================================
 import type {
   Case, RunOpts, RunResult, AgentEvent, Score, ScoreOpts,
-  JudgeSpec, LintFinding,
+  JudgeSpec, LintFinding, TranscriptSegment,
 } from "./types.ts";
+import { ConfigError } from "./errors.ts";
 
 export interface Adapter<GT = unknown, Produced = unknown> {
   /** Stable id, e.g. "perio-chart", "clinical-notes". */
   name: string;
+
+  /** Bump when run() behaviour changes so the agent-event cache misses. */
+  version?: string;
 
   /** Optional JSON-Schema-ish object for the case's groundTruth block. */
   groundTruthSchema?: object;
@@ -58,6 +62,20 @@ export interface Adapter<GT = unknown, Produced = unknown> {
   draftGroundTruth?(referenceTranscript: string): GT;
 }
 
+/** A stateful agent: segments arrive one at a time, and it may keep writing after the audio ends. */
+export interface StreamingAdapter<GT = unknown, Produced = unknown> extends Adapter<GT, Produced> {
+  start(c: Case, opts: RunOpts): Promise<void>;
+  onSegment(seg: TranscriptSegment): Promise<void>;
+  end(): Promise<void>;
+  drain(): Promise<AgentEvent[]>;
+}
+
+export function isStreaming(a: Adapter): a is StreamingAdapter {
+  const s = a as StreamingAdapter;
+  return typeof s.start === "function" && typeof s.onSegment === "function"
+    && typeof s.end === "function" && typeof s.drain === "function";
+}
+
 // ---- adapter registry ------------------------------------------------------
 // Adapters self-register here. The platform looks them up by `case.adapter`.
 const REGISTRY = new Map<string, Adapter>();
@@ -69,8 +87,8 @@ export function register(a: Adapter): void {
 export function getAdapter(name: string): Adapter {
   const a = REGISTRY.get(name);
   if (!a) {
-    throw new Error(
-      `unknown adapter "${name}". Registered: [${[...REGISTRY.keys()].join(", ")}]`,
+    throw new ConfigError(
+      `unknown adapter "${name}". Registered: [${[...REGISTRY.keys()].join(", ")}]. Fix the case "adapter" field or register it in adapters/index.ts.`,
     );
   }
   return a;

@@ -13,13 +13,16 @@
 // and bumps the version — "smoke v1", "smoke v2", ... Every run is written once
 // and never mutated, so history is just the pile of run.json files.
 // ============================================================================
-import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { CaseResult } from "./score.ts";
 import { stableStringify } from "./util.ts";
+import { resultsRoot } from "./paths.ts";
+import { ConfigError } from "./errors.ts";
 
-const RESULTS = join(process.cwd(), "results");
-const INDEX = join(RESULTS, "index.json");
+function indexPath(): string {
+  return join(resultsRoot(), "index.json");
+}
 
 export interface RunIndexEntry {
   runId: string;
@@ -30,16 +33,18 @@ export interface RunIndexEntry {
   timestamp: string;
   meanComposite: number;
   gatePassed: boolean | null;
+  partial?: boolean;
 }
 
 function readIndex(): RunIndexEntry[] {
-  if (!existsSync(INDEX)) return [];
-  try { return JSON.parse(readFileSync(INDEX, "utf8")); } catch { return []; }
+  const index = indexPath();
+  if (!existsSync(index)) return [];
+  try { return JSON.parse(readFileSync(index, "utf8")); } catch { return []; }
 }
 
 function writeIndex(rows: RunIndexEntry[]): void {
-  mkdirSync(RESULTS, { recursive: true });
-  writeFileSync(INDEX, stableStringify(rows));
+  mkdirSync(resultsRoot(), { recursive: true });
+  writeFileSync(indexPath(), stableStringify(rows));
 }
 
 /** Resolve (baseName, version, label) per the naming rule above. */
@@ -56,7 +61,7 @@ export function runIdForLabel(label: string, adapter: string): string {
   // labels already include a version, so they're unique; guard anyway
   let id = base || "run";
   let n = 2;
-  while (existsSync(join(RESULTS, adapter, id))) id = `${base}-${n++}`;
+  while (existsSync(join(resultsRoot(), adapter, id))) id = `${base}-${n++}`;
   return id;
 }
 
@@ -69,7 +74,7 @@ function adapterOf(runId: string): string | null {
 /** Absolute path to a run's folder (adapter-nested; falls back to flat). */
 export function runDir(runId: string): string {
   const a = adapterOf(runId);
-  return a ? join(RESULTS, a, runId) : join(RESULTS, runId);
+  return a ? join(resultsRoot(), a, runId) : join(resultsRoot(), runId);
 }
 /** Same path, relative — for printing to the user, e.g. "results/dental/dental-real-v1". */
 export function runDirRel(runId: string): string {
@@ -83,8 +88,13 @@ export function runDirRel(runId: string): string {
 // not you named it. Removes the "named one run, not the other" footgun.
 export function pickBaselineByAdapter(adapter: string): string | null {
   const idx = readIndex();
-  const same = idx.filter((r) => (r.adapters ?? []).includes(adapter));
+  const same = idx.filter((r) => (r.adapters ?? []).includes(adapter) && !r.partial);
   return same.length ? same[same.length - 1].runId : null;
+}
+
+/** Latest finished run of this adapter. Partial runs (cost ceiling, fail-fast) are skipped. */
+export function lastCompletedRun(adapter: string): string | null {
+  return pickBaselineByAdapter(adapter);
 }
 
 export interface RunManifest {
@@ -110,12 +120,21 @@ export interface RunManifest {
     estCostUsd: number;
   };
   cases: string[];
+  partial?: boolean;
+}
+
+export interface RepeatArtifact {
+  n: number;
+  events: unknown;
+  score: unknown;
+  trace: string;
+  cached: boolean;
 }
 
 export function saveRun(manifest: RunManifest, results: CaseResult[],
-                        artifacts: Record<string, { events: unknown; segments: unknown; trace: string; judge: unknown }>,
+                        artifacts: Record<string, { events: unknown; segments: unknown; trace: string; judge: unknown; repeats?: RepeatArtifact[] }>,
                         reportMd: string, reportJson: unknown): string {
-  const dir = join(RESULTS, manifest.adapter, manifest.runId);
+  const dir = join(resultsRoot(), manifest.adapter, manifest.runId);
   mkdirSync(join(dir, "cases"), { recursive: true });
   writeFileSync(join(dir, "run.json"), stableStringify(manifest));
   writeFileSync(join(dir, "report.md"), reportMd);
@@ -131,6 +150,13 @@ export function saveRun(manifest: RunManifest, results: CaseResult[],
     writeFileSync(join(cdir, "score.json"), stableStringify(r.score));
     writeFileSync(join(cdir, "trace.txt"), a.trace);
     if (a.judge) writeFileSync(join(cdir, "judge.json"), stableStringify(a.judge));
+    for (const rep of a.repeats ?? []) {
+      const rdir = join(cdir, `repeat-${rep.n}`);
+      mkdirSync(rdir, { recursive: true });
+      writeFileSync(join(rdir, "events.json"), stableStringify(rep.events));
+      writeFileSync(join(rdir, "score.json"), stableStringify(rep.score));
+      writeFileSync(join(rdir, "trace.txt"), rep.trace);
+    }
   }
   return dir;
 }
@@ -151,7 +177,7 @@ export function listRuns(): RunIndexEntry[] { return readIndex(); }
 
 export function loadReportJson(runId: string): any {
   const p = join(runDir(runId), "report.json");
-  if (!existsSync(p)) throw new Error(`no report.json for run ${runId}`);
+  if (!existsSync(p)) throw new ConfigError(`no report.json for run "${runId}". Pass --run with a run id from \`eval runs\`.`);
   return JSON.parse(readFileSync(p, "utf8"));
 }
 
@@ -159,17 +185,20 @@ export function loadManifest(runId: string): RunManifest {
   return JSON.parse(readFileSync(join(runDir(runId), "run.json"), "utf8"));
 }
 
-export function resultsDir(): string { return RESULTS; }
+export function resultsDir(): string { return resultsRoot(); }
 export function runExists(runId: string): boolean {
   return existsSync(join(runDir(runId), "run.json"));
 }
 export function resolveRunId(idOrLatest: string | undefined): string {
   const idx = readIndex();
   if (!idOrLatest || idOrLatest === "latest") {
-    if (!idx.length) throw new Error("no runs yet");
+    if (!idx.length) throw new ConfigError("no runs yet. Run `eval run` first.");
     return idx[idx.length - 1].runId;
   }
-  // allow matching by label too
-  const byLabel = idx.find((r) => r.label === idOrLatest);
-  return byLabel ? byLabel.runId : idOrLatest;
+  if (idx.some((r) => r.runId === idOrLatest)) return idOrLatest;
+  const byLabel = [...idx].reverse().find((r) => r.label === idOrLatest);
+  if (byLabel) return byLabel.runId;
+  const byBase = [...idx].reverse().find((r) => r.baseName === idOrLatest);
+  if (byBase) return byBase.runId;
+  return idOrLatest;
 }

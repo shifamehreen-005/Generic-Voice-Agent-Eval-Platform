@@ -1,0 +1,10 @@
+{
+  "id": "fixture-layers",
+  "schemaVersion": 1,
+  "adapter": "fixture",
+  "transcriptText": "set code four and slot three.",
+  "referenceTranscript": "set code four and slot three.",
+  "provenance": { "kind": "gold", "author": "engine", "approvedAt": "2026-10-21" },
+  "tags": ["fixture"],
+  "groundTruth": { "code": "four", "slot": "three" }
+}

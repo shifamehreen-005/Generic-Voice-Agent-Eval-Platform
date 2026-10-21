@@ -27,6 +27,31 @@ function present(factText: string, output: string): boolean {
   return f.length > 0 && normText(output).includes(f);
 }
 
+export interface SectionSpan { name: string; body: string }
+
+/** Split markdown headings (`# Title`) into ordered spans. */
+export function splitSections(text: string): SectionSpan[] {
+  const out: SectionSpan[] = [];
+  let name: string | null = null;
+  let body: string[] = [];
+  const flush = () => {
+    if (name != null) out.push({ name, body: body.join("\n") });
+    body = [];
+  };
+  for (const line of text.split("\n")) {
+    const h = /^#{1,6}\s+(.+?)\s*$/.exec(line);
+    if (h) { flush(); name = h[1]; }
+    else if (name != null) body.push(line);
+  }
+  flush();
+  return out;
+}
+
+function sectionBody(text: string, section: string): string | null {
+  const span = splitSections(text).find((s) => normText(s.name) === normText(section));
+  return span ? span.body : null;
+}
+
 // A judge client proposes verdicts. A real one calls a model at temperature 0,
 // seeing ONLY the transcript and the produced output — never the agent's
 // reasoning, never its own prior verdicts.
@@ -64,7 +89,12 @@ export function runJudge(
   let covCorrect = 0;
   for (const fact of spec.facts) {
     const v = cov.find((x) => x.id === fact.id);
-    const ok = present(fact.text, produced) || (!!v && anchored(v, produced));
+    let ok = present(fact.text, produced) || (!!v && anchored(v, produced));
+    if (ok && fact.section) {
+      const body = sectionBody(produced, fact.section);
+      const quote = v?.quote && anchored(v, produced) ? v.quote : fact.text;
+      ok = !!body && normText(body).includes(normText(quote));
+    }
     if (ok) covCorrect++;
     verdicts.push({ kind: "coverage", id: fact.id, positive: ok, quote: v?.quote ?? null, anchored: ok });
   }
@@ -98,6 +128,31 @@ export function runJudge(
     }
     const sentences = Math.max(1, produced.split(/[.!?]+/).filter((s) => s.trim()).length);
     grammar = { value: Math.max(0, 1 - verified / sentences), total: sentences, correct: sentences - verified };
+  }
+
+  for (const ban of spec.forbidden ?? []) {
+    if (ban.text && normText(produced).includes(normText(ban.text))) {
+      verdicts.push({ kind: "forbidden", id: ban.id, positive: true, quote: ban.text, anchored: true });
+    }
+  }
+
+  if (spec.sections?.length) {
+    const names = splitSections(produced).map((s) => s.name);
+    let last = -1;
+    for (const expected of spec.sections) {
+      const idxs = names
+        .map((n, i) => normText(n) === normText(expected) ? i : -1)
+        .filter((i) => i >= 0);
+      if (idxs.length === 0) {
+        verdicts.push({ kind: "template", id: `missing:${expected}`, positive: true, quote: expected, anchored: true });
+      } else if (idxs.length > 1) {
+        verdicts.push({ kind: "template", id: `duplicate:${expected}`, positive: true, quote: expected, anchored: true });
+      } else if (idxs[0] < last) {
+        verdicts.push({ kind: "template", id: `order:${expected}`, positive: true, quote: expected, anchored: true });
+      } else {
+        last = idxs[0];
+      }
+    }
   }
 
   return {

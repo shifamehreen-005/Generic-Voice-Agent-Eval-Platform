@@ -9,7 +9,7 @@
 // grabbing, after each "tooth", the first number (the tooth id) and the next
 // three numbers (the depths) — words or digits.
 // ============================================================================
-import type { AgentEvent } from "../../../platform/src/types.ts";
+import type { AgentEvent, TranscriptSegment } from "../../../platform/src/types.ts";
 
 const WORD: Record<string, number> = {
   zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
@@ -44,4 +44,15 @@ export function parseDentalTranscript(transcript: string, buggy = false): AgentE
   }
   events.push({ atMs: t, kind: "end" });
   return events;
+}
+
+/** Point each chart_tooth call at the segment that named that tooth. */
+export function tagDentalSegments(events: AgentEvent[], segments: TranscriptSegment[]): void {
+  for (const e of events) {
+    if (e.kind !== "tool_call" || e.name !== "chart_tooth") continue;
+    const tooth = String((e.args as { tooth?: unknown } | undefined)?.tooth ?? "");
+    if (!tooth) continue;
+    const seg = segments.find((s) => new RegExp(`\\b${tooth}\\b`).test(s.text));
+    if (seg) e.sourceSegmentIds = [seg.id];
+  }
 }

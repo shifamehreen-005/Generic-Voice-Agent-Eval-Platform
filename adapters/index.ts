@@ -13,3 +13,5 @@
 //  demo/adapters and are registered separately, so you can read working code.)
 // ============================================================================
 import "./sample-agent.ts";
+import "./fixture-agent.ts";
+import "./hardfail.ts";

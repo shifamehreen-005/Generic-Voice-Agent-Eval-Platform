@@ -10,6 +10,7 @@
 // ============================================================================
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { ProviderError } from "./errors.ts";
 
 let loaded = false;
 
@@ -30,9 +31,8 @@ export function requireKey(name: string): string {
   loadEnv();
   const v = process.env[name];
   if (!v) {
-    throw new Error(
-      `${name} is not set. Put it in a local .env file (see .env.example). ` +
-      `Never hard-code a key or commit it.`,
+    throw new ProviderError(
+      `${name} is not set. Add it to .env (see .env.example) and rerun.`,
     );
   }
   return v;

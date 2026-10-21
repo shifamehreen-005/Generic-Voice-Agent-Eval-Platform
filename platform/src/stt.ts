@@ -17,7 +17,7 @@ const NUM: Record<string, string> = {
   eighteen: "18", nineteen: "19", twenty: "20", thirty: "30",
 };
 
-function tokens(s: string): string[] {
+export function tokens(s: string): string[] {
   return s.toLowerCase()
     .replace(/[.,;:!?]/g, " ")
     .replace(/-/g, " ")            // "214-324" → "214 324"
