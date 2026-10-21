@@ -1,0 +1,18 @@
+{
+  "id": "brief-01",
+  "schemaVersion": 1,
+  "adapter": "brief",
+  "transcriptText": "Patient is Mara Chen. She takes no daily medication. The visit lasted twenty minutes. Vitals were within the usual range. No swelling was seen. Water was offered on arrival. The room was on the second floor. The nurse was present. Pain started on Monday. She asked about home care. The chart was updated. Brush twice a day. Use a soft brush. Avoid very cold drinks this week. Call the clinic if pain returns. Bring the insurance card next time. The hygienist is Noah. Arrive ten minutes early. Parking is behind the building. The fee was explained. She agreed to the plan. Book a follow-up in two weeks. A reminder was sent. The referral form is unsigned. Next review is in six months.",
+  "referenceTranscript": "Patient is Mara Chen. She takes no daily medication. The visit lasted twenty minutes. Vitals were within the usual range. No swelling was seen. Water was offered on arrival. The room was on the second floor. The nurse was present. Pain started on Monday. She asked about home care. The chart was updated. Brush twice a day. Use a soft brush. Avoid very cold drinks this week. Call the clinic if pain returns. Bring the insurance card next time. The hygienist is Noah. Arrive ten minutes early. Parking is behind the building. The fee was explained. She agreed to the plan. Book a follow-up in two weeks. A reminder was sent. The referral form is unsigned. Next review is in six months.",
+  "provenance": {"kind": "gold", "author": "engine", "approvedAt": "2026-10-21"},
+  "tags": ["brief", "judge"],
+  "groundTruth": {
+    "facts": [
+      {"id": "who", "text": "Patient is Mara Chen", "section": "Intake"},
+      {"id": "pain", "text": "Pain started on Monday", "section": "Findings"},
+      {"id": "canal", "text": "Schedule a root canal", "section": "Plan"}
+    ],
+    "forbidden": [{"id": "guarantee", "text": "guarantee"}],
+    "sections": ["Intake", "Findings", "Plan"]
+  }
+}

@@ -45,7 +45,7 @@ export const mockJudge: JudgeClient = {
   },
   // support: is each claim the note makes grounded in the transcript? quote from transcript.
   proposeSupport(spec: JudgeSpec, produced: string, transcript: string): JudgeVerdict[] {
-    return sentences(produced).map((claim, i) => {
+    return sentences(produced).filter((s) => !/^#{1,6}\s/.test(s)).map((claim, i) => {
       const q = bestSentence(transcript, keywords(claim));
       // if no grounding is found the judge still points at the claim itself,
       // which then fails to anchor in the transcript and is discarded.

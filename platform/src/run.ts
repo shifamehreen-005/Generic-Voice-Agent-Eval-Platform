@@ -8,7 +8,7 @@
 // Agent events are cached. An unchanged rerun replays them and costs nothing.
 // ============================================================================
 import type { Case, RunOpts, RunResult, TranscriptSegment, AgentEvent } from "./types.ts";
-import { getAdapter } from "./adapter.ts";
+import { getAdapter, isStreaming } from "./adapter.ts";
 import { scoreCase, type CaseResult } from "./score.ts";
 import { capture, readCache, sttConfigFor, type SttMode } from "./cache.ts";
 import { mockJudge } from "./mockJudge.ts";
@@ -18,6 +18,7 @@ import { round } from "./util.ts";
 import { sha1 } from "./util.ts";
 import { agentCacheKey, readAgentCache, writeAgentCache } from "./agentCache.ts";
 import { ProviderError, isProviderMessage, oneLine } from "./errors.ts";
+import { loadSegmentsFile, corruptSpeakers } from "./segments.ts";
 
 export type OnStep = (caseId: string, step: string) => void;
 
@@ -48,6 +49,10 @@ export interface RunControl {
   jobs: number;
   failFast: boolean;
   explain: boolean;
+  judgeModel?: string;
+  speed: number;
+  corruptFraction: number;
+  corruptSeed: number;
   onStep?: OnStep;
   onDone?: (r: CaseRun) => void;
   log?: (line: string) => void;
@@ -62,12 +67,65 @@ export interface RunSetResult {
 const UNSTABLE_SPREAD = 0.05;
 const ZERO_COST = { estCostUsd: 0, llmCalls: 0, inputTokens: 0, outputTokens: 0 };
 
-async function resolveSegments(cs: Case, mode: "live" | "replay", stt: SttMode): Promise<TranscriptSegment[]> {
+async function resolveSegments(cs: Case, mode: "live" | "replay", stt: SttMode, log?: (line: string) => void): Promise<TranscriptSegment[]> {
+  if (cs.segmentsFile) {
+    log?.(`${cs.id} segmentsFile ${cs.segmentsFile} (no speech provider)`);
+    return loadSegmentsFile(cs);
+  }
   const cfg = sttConfigFor(stt);
   if (mode === "live") return await capture(cs, stt, cfg);
   const cached = readCache(cs, cfg);
   if (cached) return cached;
   return await capture(cs, stt, cfg);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function driveStreaming(
+  adapter: ReturnType<typeof getAdapter>, cs: Case, segments: TranscriptSegment[],
+  mode: "live" | "replay", model: string | undefined, prompt: string | undefined,
+  seed: number, control: RunControl,
+): Promise<RunResult> {
+  if (!isStreaming(adapter)) throw new Error(`adapter ${adapter.name} is not streaming`);
+  const opts: RunOpts = { mode, segments, model, systemPromptOverride: prompt, seed, speed: control.speed };
+  await adapter.start(cs, opts);
+  const audioStart = Date.now();
+  let cursor = 0;
+  for (const seg of segments) {
+    if (control.speed === 1 && seg.startMs > cursor) await sleep(seg.startMs - cursor);
+    const elapsed = Date.now() - audioStart;
+    control.log?.(`segment id=${seg.id} speaker=${seg.speaker} elapsedMs=${elapsed}`);
+    await adapter.onSegment(seg);
+    cursor = Math.max(cursor, seg.startMs);
+  }
+  const audioMs = segments.length
+    ? segments[segments.length - 1].startMs + segments[segments.length - 1].durationMs
+    : 0;
+  const settleCap = cs.settleTimeoutMs ?? 180_000;
+  const settleStart = Date.now();
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(() => { timedOut = true; resolve(); }, settleCap);
+  });
+  await Promise.race([
+    adapter.end().then(() => { if (timer) clearTimeout(timer); }),
+    timeout,
+  ]);
+  const settleMs = Date.now() - settleStart;
+  const events = await adapter.drain();
+  return {
+    events,
+    segments,
+    transcriptText: segments.map((s) => s.text).join(" "),
+    hardFail: timedOut ? "settle_timeout" : undefined,
+    stats: {
+      wallMs: Date.now() - audioStart, llmCalls: 0, inputTokens: 0, outputTokens: 0,
+      cachedInputTokens: 0, estCostUsd: 0, perCall: [], audioMs, settleMs,
+    },
+  };
 }
 
 function buildTrace(events: AgentEvent[]): string {
@@ -91,11 +149,13 @@ export async function runCase(cs: Case, mode: "live" | "replay", repeat: number,
                               model: string | undefined, prompt: string | undefined, stt: SttMode,
                               control: RunControl): Promise<CaseRun> {
   const adapter = getAdapter(cs.adapter);
-  control.onStep?.(cs.id, "transcribing");
-  control.log?.(`${cs.id} transcribing`);
-  const segments = await resolveSegments(cs, mode, stt);
+  control.onStep?.(cs.id, cs.segmentsFile ? "reading segments" : "transcribing");
+  control.log?.(`${cs.id} ${cs.segmentsFile ? "reading segments" : "transcribing"}`);
+  const loaded = await resolveSegments(cs, mode, stt, control.log);
+  const roster = cs.speakers?.roster ?? (cs.speakers?.primary ? [cs.speakers.primary] : []);
+  const segments = corruptSpeakers(loaded, control.corruptFraction, control.corruptSeed, roster);
 
-  const judgeClient = (model === "openai" || model === "anthropic") ? makeLlmJudge(model) : mockJudge;
+  const judgeClient = (model === "openai" || model === "anthropic") ? makeLlmJudge(model, control.judgeModel) : mockJudge;
   const composites: number[] = [];
   const repeats: RepeatArtifact[] = [];
   let first: CaseResult | null = null;
@@ -125,11 +185,13 @@ export async function runCase(cs: Case, mode: "live" | "replay", repeat: number,
       control.onStep?.(cs.id, "cached");
       control.log?.(`${cs.id} repeat ${i + 1} cached`);
     } else {
-      const opts: RunOpts = { mode, segments, model, systemPromptOverride: prompt, seed: i };
+      const opts: RunOpts = { mode, segments, model, systemPromptOverride: prompt, seed: i, speed: control.speed };
       control.onStep?.(cs.id, i === 0 ? "running agent" : `repeat ${i + 1}`);
       control.log?.(`${cs.id} repeat ${i + 1} running`);
       try {
-        rr = await adapter.run(cs, opts);
+        rr = isStreaming(adapter)
+          ? await driveStreaming(adapter, cs, segments, mode, model, prompt, i, control)
+          : await adapter.run!(cs, opts);
       } catch (e) {
         throw asProvider(e);
       }

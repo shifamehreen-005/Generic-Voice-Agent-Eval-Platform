@@ -23,6 +23,9 @@ export interface Case {
 
   speakers?: { primary?: string; roster?: string[] };
 
+  /** How long end() may run after the last segment. Default 180000. */
+  settleTimeoutMs?: number;
+
   groundTruth: unknown;           // adapter-defined, validated by groundTruthSchema
 
   provenance: Provenance;
@@ -48,6 +51,7 @@ export interface AgentEvent {
   error?: string;
   data?: unknown;                 // adapter payload; platform never reads inside
   sourceSegmentIds?: number[];    // which transcript segment(s) triggered this
+  callId?: string;                // pairs a tool_call with its tool_result
 }
 
 export interface TranscriptSegment {
@@ -57,6 +61,7 @@ export interface TranscriptSegment {
   startMs: number;
   durationMs: number;
   isFinal: boolean;
+  confidence?: number;
 }
 
 // ---- 3 · adapter run I/O ---------------------------------------------------
@@ -66,6 +71,7 @@ export interface RunOpts {
   model?: string;
   systemPromptOverride?: string;
   seed?: number;
+  speed?: number;                 // 0 = as fast as possible, 1 = real time
   signal?: AbortSignal;
 }
 
@@ -116,6 +122,8 @@ export interface RunStats {
   cachedInputTokens: number;
   estCostUsd: number;
   perCall: PerCallStat[];
+  audioMs?: number;               // span of the audio that was fed
+  settleMs?: number;              // time from end() until the agent finished
 }
 
 export interface PerCallStat {
@@ -140,15 +148,17 @@ export interface LintFinding {
 
 // ---- 9 · judge -------------------------------------------------------------
 export interface JudgeSpec {
-  facts: { id: string; text: string; requiredIn?: string[] }[];
-  fields: { key: string; description: string }[];
+  facts: { id: string; text: string; requiredIn?: string[]; section?: string }[];
+  fields?: { key: string; description: string }[];
+  forbidden?: { id: string; text: string }[];   // must not appear anywhere; checked in code
+  sections?: string[];                          // expected headings, in order, once each
   checkGrammar?: boolean;         // also grade the writing quality of the output
 }
 
 // A single verdict the judge emits. `quote` MUST be verbatim from the source;
 // the platform verifies it and discards the verdict if it does not anchor.
 export interface JudgeVerdict {
-  kind: "coverage" | "support" | "grammar";
+  kind: "coverage" | "support" | "grammar" | "forbidden" | "template";
   id: string;                     // fact id, or a claim id
   positive: boolean;
   quote: string | null;           // verbatim evidence, or null

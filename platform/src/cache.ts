@@ -9,10 +9,12 @@
 // invalidates the entry — we never silently reuse segments from a different STT
 // config.
 //
-// There is no real audio in this reference build, so `audioFileHash` is derived
-// from the reference transcript. Swap `capture()` for a real STT call to go live.
+// The cache key hashes the audio bytes when the clip is on disk, and falls
+// back to the reference transcript when it is not. Swap `capture()` for a
+// real STT call to go live.
 // ============================================================================
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import type { Case, TranscriptSegment } from "./types.ts";
 import { sha1, stableStringify } from "./util.ts";
@@ -41,7 +43,17 @@ export function sttConfigFor(mode: SttMode): SttConfig {
 }
 
 function audioFileHash(c: Case): string {
-  // stand-in for hashing real audio bytes
+  if (c.audioFile) {
+    const candidates = [
+      join(process.cwd(), c.audioFile),
+      join(process.cwd(), "demo", "cases", "audio", c.audioFile),
+    ];
+    for (const p of candidates) {
+      if (existsSync(p)) {
+        return createHash("sha1").update(readFileSync(p)).digest("hex").slice(0, 12);
+      }
+    }
+  }
   return sha1(c.referenceTranscript ?? c.transcriptText ?? c.id);
 }
 

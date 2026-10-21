@@ -87,6 +87,12 @@ export async function scoreCase(
         ? [{ class: "UNSUPPORTED", at: `support:${v.id}`, expected: "grounded in transcript", produced: v.quote }]
         : [];
     }
+    if (v.kind === "forbidden") {
+      return [{ class: "FORBIDDEN", at: `forbidden:${v.id}`, expected: "absent", produced: v.quote }];
+    }
+    if (v.kind === "template") {
+      return [{ class: "TEMPLATE", at: `section:${v.id}`, expected: "heading in order, once", produced: v.quote }];
+    }
     // coverage
     return v.positive === false
       ? [{ class: "MISSING", at: `reply-fact:${v.id}`, expected: "stated in the spoken reply", produced: null }]

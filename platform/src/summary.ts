@@ -13,6 +13,8 @@ export interface SummaryCase {
   top: string[];
   cached: boolean;
   cost: number;
+  audioMs: number;
+  settleMs: number;
 }
 
 export interface Summary {
@@ -57,6 +59,8 @@ export function buildSummary(opts: {
       top: r.result.score.mismatches.slice(0, 3).map(topLine),
       cached: r.result.cached === true,
       cost: round(r.result.score.stats.estCostUsd, 4),
+      audioMs: r.result.score.stats.audioMs ?? 0,
+      settleMs: r.result.score.stats.settleMs ?? 0,
     };
   });
   const cost = round(cases.reduce((a, c) => a + c.cost, 0), 4);

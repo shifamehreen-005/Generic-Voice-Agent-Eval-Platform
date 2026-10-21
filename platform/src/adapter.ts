@@ -7,7 +7,7 @@
 // ============================================================================
 import type {
   Case, RunOpts, RunResult, AgentEvent, Score, ScoreOpts,
-  JudgeSpec, LintFinding,
+  JudgeSpec, LintFinding, TranscriptSegment,
 } from "./types.ts";
 import { ConfigError } from "./errors.ts";
 
@@ -60,6 +60,20 @@ export interface Adapter<GT = unknown, Produced = unknown> {
    * always marked provenance.kind = "silver" by the platform.
    */
   draftGroundTruth?(referenceTranscript: string): GT;
+}
+
+/** A stateful agent: segments arrive one at a time, and it may keep writing after the audio ends. */
+export interface StreamingAdapter<GT = unknown, Produced = unknown> extends Adapter<GT, Produced> {
+  start(c: Case, opts: RunOpts): Promise<void>;
+  onSegment(seg: TranscriptSegment): Promise<void>;
+  end(): Promise<void>;
+  drain(): Promise<AgentEvent[]>;
+}
+
+export function isStreaming(a: Adapter): a is StreamingAdapter {
+  const s = a as StreamingAdapter;
+  return typeof s.start === "function" && typeof s.onSegment === "function"
+    && typeof s.end === "function" && typeof s.drain === "function";
 }
 
 // ---- adapter registry ------------------------------------------------------

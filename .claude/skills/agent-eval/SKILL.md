@@ -78,10 +78,15 @@ npm run eval -- run --adapter <name> --name v3 --json
 
 ## Add an adapter
 
-1. Copy `adapters/sample-agent.ts` to `adapters/<name>.ts`. Implement `run`, `fold`, and `score` or `judgeSpec`.
-2. Import it from `adapters/index.ts`.
-3. Add a case JSON. Exactly one of `audioFile`, `segmentsFile`, `transcriptText`. `groundTruth` is the answer key. `provenance.kind` starts as `silver` until a person approves it.
-4. `npm run eval -- run --cases <file> --adapter <name> --provider mock --json`
-5. One real run after mock is green: `--provider openai` (needs `OPENAI_API_KEY`).
+Copy `adapters/sample-agent.ts`. It scores cells (`field:text`) with tolerance 0 and three metrics: `exact`, `presence`, `clean`. Gold may include `corrections` (applied before scoring) and `neighbors` (a value on the neighbour key is `SHIFTED`). Mismatch classes are `MISSING`, `WRONG`, `SHIFTED`, `TRANSPOSED`, `EXTRA`.
 
-`eval score --run <id>` re-grades saved events with no model calls. Bump nothing yourself; the platform owns `SCORER_VERSION`.
+1. Copy the file to `adapters/<name>.ts`. Implement `run`, `fold`, and `score` or `judgeSpec`. Import it from `adapters/index.ts`.
+2. Add a case. Exactly one of `audioFile`, `segmentsFile`, `transcriptText`. `provenance.kind` stays `silver` until a person approves it.
+3. `npm run eval -- run --cases <file> --adapter <name> --provider mock --json` must pass. `--provider mock-bug` must fail the gate. No key yet.
+4. One real run after that: `--provider openai` (needs `OPENAI_API_KEY`).
+
+For an agent that hears segments and keeps state, copy `demo/adapters/form/adapter.ts` instead. Implement `start`, `onSegment`, `end`, `drain`. Put a `segmentsFile` on the case (`id`, `text`, `speaker`, `startMs`, `durationMs`, `isFinal`). `speakers.roster` is who the agent acts on. `--speed 0` is as fast as possible, `--speed 1` keeps the gaps. `--corrupt-speakers 0.3 --corrupt-seed 1` flips that share of operator segments to `UU`. `settleTimeoutMs` bounds `end()`; a timeout is `hardFail: settle_timeout` and exit 2. `settleMs` is on the summary.
+
+A long reply uses `judgeSpec`: `facts` (optional `section`), `forbidden`, `sections` (headings, in order, once). Forbidden words and heading order are code. Facts stay quote-anchored. The model is `config/judge.json`. `--judge-model` overrides it. See `demo/cases/brief`.
+
+`eval score --run <id>` re-grades saved events with no model calls. The platform owns `SCORER_VERSION`.

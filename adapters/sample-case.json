@@ -3,12 +3,15 @@
   "id": "sample-reminder-01",
   "schemaVersion": 1,
   "adapter": "sample",
-  "transcriptText": "Remind me to call the pharmacy at 4pm.",
-  "referenceTranscript": "Remind me to call the pharmacy at 4pm.",
+  "transcriptText": "Remind me to call the pharmacy at 4pm for Ada.",
+  "referenceTranscript": "Remind me to call the pharmacy at 4pm for Ada.",
   "provenance": {"kind": "gold", "author": "you", "approvedAt": "2026-09-19"},
   "tags": ["sample", "reminder"],
   "groundTruth": {
-    "text": "call the pharmacy",
-    "time": "4pm"
+    "cells": {
+      "field:text": "call the pharmacy",
+      "field:time": "4pm",
+      "field:who": "Ada"
+    }
   }
 }

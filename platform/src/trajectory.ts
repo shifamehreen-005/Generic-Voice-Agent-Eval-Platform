@@ -66,8 +66,10 @@ export function scoreTrajectory(events: AgentEvent[], expected: ExpectedCall[]):
   }
 
   const extras = calls.length - consumed.size;
-  const perCallMs = calls.map((c, i) => {
-    const res = events.find((e) => e.kind === "tool_result" && events.indexOf(e) > events.indexOf(c));
+  const perCallMs = calls.map((c) => {
+    const res = c.callId
+      ? events.find((e) => e.kind === "tool_result" && e.callId === c.callId)
+      : events.find((e) => e.kind === "tool_result" && events.indexOf(e) > events.indexOf(c));
     return res ? res.atMs - c.atMs : 0;
   });
 

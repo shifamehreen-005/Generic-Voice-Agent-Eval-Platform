@@ -10,18 +10,19 @@
 import type { JudgeSpec, JudgeVerdict } from "./types.ts";
 import type { JudgeClient } from "./judge.ts";
 import { requireKey } from "./env.ts";
+import { resolveJudgeModel } from "./judgeConfig.ts";
 
 type Provider = "openai" | "anthropic";
 
 // One JSON-only call to the model. Returns parsed JSON or throws.
-async function ask(provider: Provider, system: string, user: string): Promise<any> {
+async function ask(provider: Provider, model: string, system: string, user: string): Promise<any> {
   if (provider === "openai") {
     const key = requireKey("OPENAI_API_KEY");
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o", temperature: 0,
+        model, temperature: 0,
         response_format: { type: "json_object" },
         messages: [{ role: "system", content: system }, { role: "user", content: user }],
       }),
@@ -34,7 +35,7 @@ async function ask(provider: Provider, system: string, user: string): Promise<an
     method: "POST",
     headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-5", max_tokens: 1024, temperature: 0,
+      model, max_tokens: 1024, temperature: 0,
       system: system + " Reply with ONLY a JSON object, no prose.",
       messages: [{ role: "user", content: user }],
     }),
@@ -46,7 +47,7 @@ async function ask(provider: Provider, system: string, user: string): Promise<an
 
 // The judge client makes its calls lazily & synchronously-cached per case is not
 // needed here; run.ts calls per case. We pre-fetch verdicts once and memoize.
-export function makeLlmJudge(provider: Provider): JudgeClient {
+export function makeLlmJudge(provider: Provider, modelOverride?: string): JudgeClient {
   // NOTE: the JudgeClient interface is synchronous, so we do the (async) model
   // calls here via a tiny cache keyed by the produced text. runJudge is called
   // right after warm(), which fills the cache.
@@ -62,7 +63,7 @@ export function makeLlmJudge(provider: Provider): JudgeClient {
       ` "support": [{"id","positive","quote"}]    // for each claim the AGENT OUTPUT makes, is it grounded in the TRANSCRIPT? quote from TRANSCRIPT.\n` +
       (spec.checkGrammar ? ` "grammar": [{"id","positive","quote"}]   // list ONLY ungrammatical sentences; quote each from AGENT OUTPUT.\n` : "") +
       `}\nRequired facts:\n${facts}`;
-    const j = await ask(provider, sys, user);
+    const j = await ask(provider, resolveJudgeModel(provider, modelOverride), sys, user);
     cache.set(produced, {
       coverage: (j.coverage ?? []).map((v: any) => ({ kind: "coverage", ...v })),
       support: (j.support ?? []).map((v: any, i: number) => ({ kind: "support", id: v.id ?? `claim-${i}`, positive: v.positive, quote: v.quote })),

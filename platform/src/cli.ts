@@ -20,7 +20,7 @@ import { writeFileSync, readFileSync, existsSync, appendFileSync, mkdirSync } fr
 import { basename, dirname, join } from "node:path";
 import "../../demo/adapters/index.ts";
 import "../../adapters/index.ts";
-import { getAdapter, allAdapters } from "./adapter.ts";
+import { getAdapter, allAdapters, isStreaming } from "./adapter.ts";
 import { loadCases, loadCaseFile } from "./loader.ts";
 import { lintSet, lintCase, hasBlockingError } from "./lint.ts";
 import { runSet } from "./run.ts";
@@ -94,10 +94,15 @@ async function cmdRun() {
   const mode = modeArg;
   const repeat = numArg("repeat", 1, "Use an integer >= 1.");
   if (repeat < 1) throw new ConfigError(`--repeat must be an integer >= 1. Got ${repeat}.`);
-  const jobs = numArg("jobs", 4, "Use an integer >= 1.");
+  let jobs = numArg("jobs", 4, "Use an integer >= 1.");
   if (jobs < 1) throw new ConfigError(`--jobs must be an integer >= 1. Got ${jobs}.`);
   const maxCost = numArg("max-cost", 5, "USD, 0 or more.");
   if (maxCost < 0) throw new ConfigError(`--max-cost must be >= 0. Got ${maxCost}.`);
+  const speed = numArg("speed", 0, "0 = as fast as possible, 1 = real time.");
+  if (speed !== 0 && speed !== 1) throw new ConfigError(`--speed must be 0 or 1. Got ${speed}.`);
+  const corruptFraction = numArg("corrupt-speakers", 0, "A fraction from 0 to 1.");
+  if (corruptFraction < 0 || corruptFraction > 1) throw new ConfigError(`--corrupt-speakers must be between 0 and 1. Got ${corruptFraction}.`);
+  const corruptSeed = numArg("corrupt-seed", 1, "An integer.");
 
   const provider = arg("provider");
   const model = provider ?? arg("model");
@@ -139,7 +144,9 @@ async function cmdRun() {
   const runId = store.runIdForLabel(label, primaryAdapter);
   const dir = join(resultsRoot(), primaryAdapter, runId);
   const log = openLog(join(dir, "log.txt"));
-  log(`run ${label} cases=${cases.length} skipped=${skipped} agent=${model ?? "mock"} stt=${stt}`);
+  const streaming = cases.some((cs) => { try { return isStreaming(getAdapter(cs.adapter)); } catch { return false; } });
+  if (streaming && jobs > 1) { jobs = 1; log("streaming adapter: jobs set to 1"); }
+  log(`run ${label} cases=${cases.length} skipped=${skipped} agent=${model ?? "mock"} stt=${stt} speed=${speed}`);
   if (!json) {
     console.log(c.b(`\n  ${label}`) + c.dim(`   ${cases.length} cases · agent=${model ?? "mock"} · speech-to-text=${stt}\n`));
   }
@@ -158,6 +165,10 @@ async function cmdRun() {
     jobs,
     failFast: flag("fail-fast"),
     explain: flag("explain"),
+    judgeModel: arg("judge-model"),
+    speed,
+    corruptFraction,
+    corruptSeed,
     onStep: json ? undefined : onStep,
     onDone: json ? undefined : onDone,
     log,
@@ -491,7 +502,8 @@ const usage =
   `usage: eval <run|score|gate|lint|draft|cases|runs|show|diff|doctor|html>\n` +
   `  run    --adapter <name> [--provider mock|mock-bug|openai|anthropic] [--json]\n` +
   `         [--case <id>] [--tag a,b] [--failed-only] [--fail-fast] [--no-cache]\n` +
-  `         [--max-cost <usd>] [--jobs N] [--repeat N] [--explain] [--name x]\n` +
+  `         [--max-cost <usd>] [--jobs N] [--repeat N] [--speed 0|1] [--explain] [--name x]\n` +
+  `         [--corrupt-speakers <fraction>] [--corrupt-seed <n>] [--judge-model <name>]\n` +
   `  show   --run <name> --case <id>     feedback blocks only (max 20)\n` +
   `  diff   --a <run> --b <run>          cells whose value changed\n` +
   `  doctor                              node, keys, cache, adapters\n` +

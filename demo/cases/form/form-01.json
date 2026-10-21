@@ -1,0 +1,11 @@
+{
+  "id": "form-01",
+  "schemaVersion": 1,
+  "adapter": "form",
+  "segmentsFile": "demo/cases/form/segments/form-01.segments.json",
+  "referenceTranscript": "name is Ada. name is Bea. city is Paris. city is Lyon.",
+  "speakers": {"primary": "S1", "roster": ["S1"]},
+  "provenance": {"kind": "gold", "author": "engine", "approvedAt": "2026-10-21"},
+  "tags": ["form", "streaming"],
+  "groundTruth": {"fields": {"name": "Bea", "city": "Paris"}}
+}
