@@ -1,0 +1,8 @@
+{
+  "id": "fixture-hardfail",
+  "schemaVersion": 1,
+  "adapter": "hardfail",
+  "transcriptText": "this run crashes.",
+  "provenance": { "kind": "gold", "author": "engine", "approvedAt": "2026-10-21" },
+  "groundTruth": {}
+}

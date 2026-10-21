@@ -15,6 +15,8 @@ import { scoreLayer1, type Layer1 } from "./stt.ts";
 import { scoreTrajectory, type ExpectedCall, type TrajectoryScore } from "./trajectory.ts";
 import { runJudge, type JudgeResult, type JudgeClient } from "./judge.ts";
 import { round } from "./util.ts";
+import { attachFeedback } from "./feedback.ts";
+import { ConfigError } from "./errors.ts";
 
 export interface CaseResult {
   caseId: string;
@@ -27,6 +29,7 @@ export interface CaseResult {
   produced: unknown;
   transcriptText: string;
   hardFail?: string;
+  cached?: boolean;               // agent events replayed; this case cost 0
   explanation?: string;           // plain-English "what went wrong", filled by run.ts
 }
 
@@ -105,8 +108,13 @@ export async function scoreCase(
     score = { metrics: judgePart.metrics, composite: judgePart.composite,
       weights: even(Object.keys(judgePart.metrics)), mismatches: judgeMismatches(), extras: 0, stats: rr.stats };
   } else {
-    throw new Error(`adapter ${adapter.name} has neither score() nor judgeSpec()`);
+    throw new ConfigError(`adapter "${adapter.name}" has neither score() nor judgeSpec(). Add one of them.`);
   }
+
+  score = {
+    ...score,
+    mismatches: attachFeedback(score.mismatches, rr.segments ?? [], c.referenceTranscript, rr.events, rr.transcriptText),
+  };
 
   if (rr.hardFail) score = { ...score, composite: 0, hardFail: rr.hardFail };
 

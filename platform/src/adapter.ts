@@ -9,10 +9,14 @@ import type {
   Case, RunOpts, RunResult, AgentEvent, Score, ScoreOpts,
   JudgeSpec, LintFinding,
 } from "./types.ts";
+import { ConfigError } from "./errors.ts";
 
 export interface Adapter<GT = unknown, Produced = unknown> {
   /** Stable id, e.g. "perio-chart", "clinical-notes". */
   name: string;
+
+  /** Bump when run() behaviour changes so the agent-event cache misses. */
+  version?: string;
 
   /** Optional JSON-Schema-ish object for the case's groundTruth block. */
   groundTruthSchema?: object;
@@ -69,8 +73,8 @@ export function register(a: Adapter): void {
 export function getAdapter(name: string): Adapter {
   const a = REGISTRY.get(name);
   if (!a) {
-    throw new Error(
-      `unknown adapter "${name}". Registered: [${[...REGISTRY.keys()].join(", ")}]`,
+    throw new ConfigError(
+      `unknown adapter "${name}". Registered: [${[...REGISTRY.keys()].join(", ")}]. Fix the case "adapter" field or register it in adapters/index.ts.`,
     );
   }
   return a;

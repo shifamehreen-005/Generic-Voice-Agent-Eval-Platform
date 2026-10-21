@@ -8,7 +8,7 @@
   },
   "scripts": {
     "eval": "tsx platform/src/cli.ts",
-    "test": "tsx platform/src/judge.test.ts && tsx platform/src/match.test.ts && tsx demo/adapters/dental/score.test.ts",
+    "test": "tsx platform/src/judge.test.ts && tsx platform/src/match.test.ts && tsx demo/adapters/dental/score.test.ts && tsx platform/src/engine.test.ts",
     "clean": "node -e \"const fs=require('fs');['results','.cache','demo/cases/audio'].forEach(d=>fs.rmSync(d,{recursive:true,force:true}));console.log('cleaned results/, .cache/, demo/cases/audio/')\"",
     "gen-audio": "tsx demo/gen-audio.ts",
     "eval:real:dental": "tsx demo/gen-audio.ts --adapter dental && tsx platform/src/cli.ts run --adapter dental --provider openai --stt openai --prompt demo/prompts/dental-good.txt --name dental-real",

@@ -75,6 +75,7 @@ export interface RunResult {
   transcriptText: string;
   stats: RunStats;
   hardFail?: string;              // "crashed" | "ended_early" | "timeout" ...
+  cached?: boolean;               // replayed from the agent-event cache; cost is 0
 }
 
 // ---- 6 · score object ------------------------------------------------------
@@ -102,6 +103,9 @@ export interface Mismatch {
   produced: unknown;
   eventIndex?: number;            // pointer back into the trace
   segmentIds?: number[];          // pointer back into the transcript
+  heard?: string;                 // transcript words the agent acted on
+  said?: string;                  // the same span in the reference transcript
+  layer?: "stt" | "agent" | "scorer-uncertain";
 }
 
 export interface RunStats {

@@ -16,7 +16,7 @@
 import { register } from "../../../platform/src/adapter.ts";
 import type { Adapter } from "../../../platform/src/adapter.ts";
 import type { Case, RunOpts, RunResult, AgentEvent, Score, Mismatch, MetricValue } from "../../../platform/src/types.ts";
-import { parseDentalTranscript } from "./mock.ts";
+import { parseDentalTranscript, tagDentalSegments } from "./mock.ts";
 import { llmAgentOpenAI, llmAgentAnthropic, type ToolDef } from "../../../platform/src/providers.ts";
 
 interface DentalGT { teeth: Record<string, number[]> }   // { "14": [3,2,4], ... }
@@ -83,6 +83,7 @@ const adapter: Adapter<DentalGT, Produced> = {
       events = parseDentalTranscript(transcript, provider === "mock-bug");
       cost = 0.02;
     }
+    tagDentalSegments(events, opts.segments ?? []);
 
     return {
       events, segments: opts.segments ?? [], transcriptText: transcript,

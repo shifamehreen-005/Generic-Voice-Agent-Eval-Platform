@@ -7,31 +7,81 @@ description: Run, score and gate voice agent evals. Use when asked to test an ag
 
 # agent-eval
 
-A router into the CLI. Full detail lives in `README.md` and the build spec.
+Drive the eval from this file. Do not open the README or the source unless a command here fails in a way this file does not explain.
 
-## Run an eval
-`npm run eval -- run --adapter <name> --mode replay` (cases default to `demo/cases`;
-pass `--cases <path>` for your own). Results land in `results/<adapter>/<run-id>/report.md`.
-Read that first, then `results/<adapter>/<run-id>/cases/<case-id>/score.json` for the mismatch list.
+Commands run as `npm run eval -- <command>`. Results go under `results/<adapter>/<run-id>/`.
 
-## Compare a change (which model / agent version)
-Run baseline, apply the change, run candidate, then
-`npm run eval -- gate --baseline <a> --candidate <b>`. Non-zero exit means regression.
-Here `--model v1|v2` selects the fixture agent version.
+## Loop
 
-## Add a case
-1. Drop the case JSON (or audio) in your cases folder (examples in `demo/cases/`).
-2. `npm run eval -- draft --case <file>` to get silver ground truth. 3. `npm run eval -- lint --cases <file>`
-and fix every error. 4. A human reviews and flips provenance to gold. Never score
-against unreviewed silver.
+```
+npm run eval -- doctor
+npm run eval -- run --adapter <name> --name v1 --json
+# edit the agent prompt or code
+npm run eval -- run --adapter <name> --name v2 --json
+npm run eval -- diff --a v1 --b v2
+```
 
-## Write an adapter
-Copy `adapters/sample-agent.ts` and implement the `Adapter` interface. Required:
-`run`, `fold`. Then `score` and/or `judgeSpec`; register it in `adapters/index.ts`.
-See the worked examples `demo/adapters/dental` (deterministic, real STT + LLM agent)
-and `demo/adapters/receptionist` (deterministic booking + judged reply).
+`--json` prints one object and writes `summary.json`. When stdout is not a terminal it is the default. Read `summary.json` first. Then `cases/<id>/score.json` for the mismatch list. Open `log.txt` only if asked. Do not diff two full reports.
+
+`run` is the label (`v1 v1` when you passed `--name v1`). `runId` is the folder name. `baseline` is the previous run. `gate` is `pass` or `fail`. `exit` matches the process exit code. Each case has `composite`, `delta`, `hardFail`, `mismatches`, `top` (at most 3 lines), `cached`, and `cost`.
+
+## Fix one case
+
+```
+npm run eval -- show --run <run> --case <id>
+npm run eval -- run --adapter <name> --name v3 --failed-only --json
+npm run eval -- run --adapter <name> --name v3 --json
+```
+
+`show` prints at most 20 feedback blocks and nothing else. `diff --a <run> --b <run>` prints only cells whose value changed, same block:
+
+```json
+{ "class": "WRONG", "at": "field:x", "expected": [], "produced": [],
+  "heard": "words the agent acted on", "said": "the reference span",
+  "layer": "agent", "eventIndex": 0 }
+```
+
+`layer` is `stt` (heard and said disagree on a token that matters), `agent` (they agree and the value is still wrong), or `scorer-uncertain` (no reference transcript). Fix the layer it names. Report the mismatch classes, not a percentage.
+
+`--failed-only` reruns cases that failed the last completed run of this adapter. `skipped` in the summary is how many were left out. After it is green, run once without `--failed-only` before you finish.
+
+## Exit codes
+
+| exit | meaning | what to do |
+|---|---|---|
+| 0 | pass | keep the change |
+| 1 | gate failed | read `top` and `diff`; the candidate is worse than the baseline |
+| 2 | a case hard-failed | read `hardFail` on that case; a crash or settle timeout is not a score |
+| 3 | bad config or case file | the stderr line names the field; fix that file |
+| 4 | provider error or cost ceiling | key, quota, or network: fix `.env`. Cost: `stopped` is `max-cost`; raise `--max-cost` or pass `--case` |
+
+`--debug` prints a stack trace. Without it every error is one line.
+
+## Flags
+
+- `--provider mock` offline. `mock-bug` is the broken demo. `openai` or `anthropic` needs a key in `.env`.
+- `--case <id>` one case. `--tag a,b` cases carrying either tag. `--fail-fast` stop after the first failure.
+- `--no-cache` forces a fresh agent run. Default replays cached events: `cached: true` and `cost: 0`.
+- `--max-cost <usd>` default 5. Hitting it writes a partial summary and exits 4. Stop. Do not raise it to push a change through.
+- `--jobs N` default 4. `--repeat N` keeps every pass in `cases/<id>/repeat-<n>/`.
+- `--explain` asks a model for prose. Leave it off. The feedback block is what you use.
+- `--mode replay` is the default. Do not use `live` unless you mean to pay for speech-to-text.
+
+`doctor` checks node, whether keys are set, that the cache is writable, and that adapters load. Exit 0, or one line per problem.
 
 ## Rules
-- Default to replay mode. Live mode costs real money and adds STT variance.
-- Never edit ground truth to make a run pass.
-- Report the mismatch classes, not just the percentage.
+
+- Replay by default. Live mode spends money and adds speech-to-text variance.
+- Never edit ground truth to make a run pass. Silver (`eval draft`) is not gold until a person flips `provenance.kind`.
+- Do not score against unreviewed silver.
+- Stop when `--max-cost` trips. Report mismatch classes, not just the composite.
+
+## Add an adapter
+
+1. Copy `adapters/sample-agent.ts` to `adapters/<name>.ts`. Implement `run`, `fold`, and `score` or `judgeSpec`.
+2. Import it from `adapters/index.ts`.
+3. Add a case JSON. Exactly one of `audioFile`, `segmentsFile`, `transcriptText`. `groundTruth` is the answer key. `provenance.kind` starts as `silver` until a person approves it.
+4. `npm run eval -- run --cases <file> --adapter <name> --provider mock --json`
+5. One real run after mock is green: `--provider openai` (needs `OPENAI_API_KEY`).
+
+`eval score --run <id>` re-grades saved events with no model calls. Bump nothing yourself; the platform owns `SCORER_VERSION`.

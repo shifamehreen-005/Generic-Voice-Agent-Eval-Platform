@@ -9,6 +9,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, basename } from "node:path";
 import type { Case } from "./types.ts";
+import { ConfigError } from "./errors.ts";
 
 /** Recursively drop every key that starts with "_". */
 export function stripUnderscores<T>(value: T): T {
@@ -25,17 +26,25 @@ export function stripUnderscores<T>(value: T): T {
 }
 
 export function loadCaseFile(path: string): Case {
-  const raw = JSON.parse(readFileSync(path, "utf8"));
+  const file = basename(path);
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    throw new ConfigError(`${file}: invalid JSON. Fix the syntax in ${path}.`);
+  }
   const c = stripUnderscores(raw) as Case;
 
-  const entries = [c.audioFile, c.segmentsFile, c.transcriptText]
-    .filter((x) => x != null);
-  if (entries.length !== 1) {
-    throw new Error(
-      `${basename(path)}: exactly one of audioFile/segmentsFile/transcriptText required, got ${entries.length}`,
+  const present = (["audioFile", "segmentsFile", "transcriptText"] as const).filter((k) => c[k] != null);
+  if (present.length !== 1) {
+    const which = present.length ? present.map((k) => `"${k}"`).join(" and ") : `"audioFile"`;
+    const problem = present.length === 0 ? "is missing" : "is set more than once";
+    throw new ConfigError(
+      `${file}: field ${which} ${problem}. Set exactly one of audioFile, segmentsFile, or transcriptText.`,
     );
   }
-  if (!c.adapter) throw new Error(`${basename(path)}: missing "adapter"`);
+  if (!c.id) throw new ConfigError(`${file}: field "id" is missing. Add "id": "<case-id>".`);
+  if (!c.adapter) throw new ConfigError(`${file}: field "adapter" is missing. Add "adapter": "<name>".`);
   if (!c.provenance) c.provenance = { kind: "silver" };  // unmarked drafts are silver
   return c;
 }
